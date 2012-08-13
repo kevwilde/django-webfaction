@@ -15,9 +15,9 @@ import xmlrpclib
 __author__ = 'zeus'
 __version__ = '0.1'
 
-GUNICORN_CONFIG_TEMPLATE = 'https://raw.github.com/hovel/django-webfaction/master/templates/config.py'
-GUNICORN_CONFIG_RUN_SCRIPT = 'https://raw.github.com/hovel/django-webfaction/master/templates/gunicorn.sh'
-SETTINGS_LOCAL_TEMPLATE = 'https://raw.github.com/hovel/django-webfaction/master/templates/settings_local.py'
+GUNICORN_CONFIG_TEMPLATE = 'https://raw.github.com/nathants/django-webfaction/master/templates/config.py'
+GUNICORN_CONFIG_RUN_SCRIPT = 'https://raw.github.com/nathants/django-webfaction/master/templates/gunicorn.sh'
+SETTINGS_LOCAL_TEMPLATE = 'https://raw.github.com/nathants/django-webfaction/master/templates/settings_local.py'
 
 
 VALID_SYMBOLS = re.compile('^\w+$')
@@ -353,12 +353,9 @@ def main():
     cmd = subparsers.add_parser('create_app', help='Create a new application')
     cmd.set_defaults(func=_create_app)
     cmd.add_argument('name', help="Unique name for new app")
-    cmd.add_argument('type',
-        help="Application type (typical 'custom_app_with_port' or 'static_only')")
-    cmd.add_argument('--autostart', default=False,
-        help = "Whether the app should restart with an autostart.cgi script")
-    cmd.add_argument('--extra_info', default='',
-        help="Additional information required by the application")
+    cmd.add_argument('type', help="Application type (typical 'custom_app_with_port' or 'static_only')")
+    cmd.add_argument('--autostart', default=False, help="Whether the app should restart with an autostart.cgi script")
+    cmd.add_argument('--extra_info', default='', help="Additional information required by the application")
 
     cmd = subparsers.add_parser('delete_app', help='Delete an application')
     cmd.set_defaults(func=_delete_app)
