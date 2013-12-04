@@ -25,6 +25,7 @@ VALID_SYMBOLS = re.compile('^\w+$')
 # http://stackoverflow.com/a/16922105/573034
 VALID_DOMAINS = re.compile('^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$')
 VALID_URL_PATHS = re.compile('^\/[/.a-zA-Z0-9-]*$')
+VALID_EMAILS = re.compile('[^@]+@[^@]+\.[^@]+')
 
 def _gen_password(lfrom=8, lto=10):
     return ''.join((random.choice(string.letters+string.digits) for _ in xrange(random.randint(8,10))))
@@ -112,14 +113,15 @@ def _create_domain(args):
     api = _login(args)
 
     invalid = []
-    for domain in [args.domain] + args.subdomain:
+    expanded = ['%s.%s' % (s, args.domain) for s in args.subdomain]
+    for domain in [args.domain] + expanded:
         if not VALID_DOMAINS.match(domain):
             invalid.append(domain)
 
     if invalid:
         invalid = ('s' if len(invalid) > 1 else '', ', '.join(invalid))
         print('Error: invalid domain name%s %s' % invalid)
-        exit(1)
+        return
 
     response = api.create_domain(args.domain, '.'.join(args.subdomain))
     print('Domain has been created:')
@@ -133,7 +135,7 @@ def _create_website(args):
         print('Error: invalid site applications array')
         print('Array items should be pairs of application name and URL path')
         print('Example: django_app / django_app_media /media')
-        exit(1)
+        return
     else:
         site_apps = zip(args.site_apps[::2], args.site_apps[1::2])
         for site_app in site_apps:
@@ -141,12 +143,12 @@ def _create_website(args):
             if not VALID_SYMBOLS.match(app_name):
                 print('Error: %s is not a valid app name' % app_name)
                 print('use A-Z a-z 0-9 or uderscore symbols only')
-                exit(1)
+                return
 
             if not VALID_URL_PATHS.match(app_url):
                 print('Error: %s is not a valid URL path' % app_url)
                 print('must start with / and only regular characters, . and -')
-                exit(1)
+                return
 
         response = api.create_website(args.website_name, args.ip, args.https, \
             args.subdomains, *site_apps)
@@ -192,7 +194,7 @@ def _create_mailbox(args):
     if not VALID_SYMBOLS.match(args.mailbox):
         print('Error: %s is not a valid mailbox name' % args.mailbox)
         print('use A-Z a-z 0-9 or uderscore symbols only')
-        exit(1)
+        return
 
     response = api.create_mailbox(args.mailbox, args.enable_spam_protection, \
         args.discard_spam, args.spam_redirect_folder, args.use_manual_procmailrc, \
@@ -206,6 +208,25 @@ def _create_mailbox(args):
 def _delete_mailbox(args):
     api = _login(args)
     api.delete_mailbox(args.mailbox)
+
+def _create_email(args):
+    api = _login(args)
+
+    if not VALID_EMAILS.match(args.email_address):
+        print('Error: %s is not a valid email address' % args.email_address)
+        return
+
+    response = api.create_email(args.email_address, args.targets, False, '', \
+        '', '', '', '')
+
+    print('Email address has been created:')
+    table = Texttable(max_width=140)
+    table.add_rows([['Param', 'Value']] + [[key, value] for key, value in response.items()])
+    print(table.draw())
+
+def _delete_email(args):
+    api = _login(args)
+    api.delete_email(args.email_address)
 
 def _state(args):
     """
@@ -489,6 +510,21 @@ def main():
     cmd = subparsers.add_parser('delete_mailbox', help='Delete a mailbox')
     cmd.set_defaults(func=_delete_mailbox)
     cmd.add_argument('mailbox', help='mailbox name')
+
+    cmd = subparsers.add_parser('create_email', help='Create an email address which delivers to the specified mailboxes')
+    cmd.set_defaults(func=_create_email)
+    cmd.add_argument('--autoresponder-on', help='whether an autoresponder is enabled for the address (ignored)')
+    cmd.add_argument('--autoresponder-subject', help='subject line of the autoresponder message (ignored)')
+    cmd.add_argument('--autoresponder-message', help='body of the autoresponder message (ignored)')
+    cmd.add_argument('--autoresponder-from', help='originating address of the autoresponder message (ignored)')
+    cmd.add_argument('--script-machine', help='a machine name for specifying a path to a script (ignored)')
+    cmd.add_argument('--script-path', help='an absolute path to a script (ignored)')
+    cmd.add_argument('email_address', help="an email address")
+    cmd.add_argument('targets', help="names of destination mailboxes or addresses")
+
+    cmd = subparsers.add_parser('delete_email', help='Delete an email addess')
+    cmd.set_defaults(func=_delete_email)
+    cmd.add_argument('email_address', help='an email address (for example, name@example.com)')
 
     cmd = subparsers.add_parser('state', help='Short state of your machines (apps count, current ram usage)')
     cmd.set_defaults(func=_state)
