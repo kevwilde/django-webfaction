@@ -22,6 +22,10 @@ SETTINGS_LOCAL_TEMPLATE = 'https://raw.github.com/nathants/django-webfaction/mas
 
 VALID_SYMBOLS = re.compile('^\w+$')
 
+# http://stackoverflow.com/a/16922105/573034
+VALID_DOMAINS = re.compile('^[a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6}$')
+VALID_URL_PATHS = re.compile('^\/[/.a-zA-Z0-9-]*$')
+
 def _gen_password(lfrom=8, lto=10):
     return ''.join((random.choice(string.letters+string.digits) for _ in xrange(random.randint(8,10))))
 
@@ -103,6 +107,62 @@ def _create_app(args):
 def _delete_app(args):
     api = _login(args)
     api.delete_app(args.name)
+
+def _create_domain(args):
+    api = _login(args)
+
+    invalid = []
+    for domain in [args.domain] + args.subdomain:
+        if not VALID_DOMAINS.match(domain):
+            invalid.append(domain)
+
+    if invalid:
+        invalid = ('s' if len(invalid) > 1 else '', ', '.join(invalid))
+        print('Error: invalid domain name%s %s' % invalid)
+        exit(1)
+
+    response = api.create_domain(args.domain, '.'.join(args.subdomain))
+    print('Domain has been created:')
+    table = Texttable(max_width=140)
+    table.add_rows([['Param', 'Value']] + [[key, value] for key, value in response.items()])
+    print(table.draw())
+
+def _create_website(args):
+    api = _login(args)
+    if len(args.site_apps) % 2:
+        print('Error: invalid site applications array')
+        print('Array items should be pairs of application name and URL path')
+        print('Example: django_app / django_app_media /media')
+        exit(1)
+    else:
+        site_apps = zip(args.site_apps[::2], args.site_apps[1::2])
+        for site_app in site_apps:
+            app_name, app_url = site_app
+            if not VALID_SYMBOLS.match(app_name):
+                print('Error: %s is not a valid app name' % app_name)
+                print('use A-Z a-z 0-9 or uderscore symbols only')
+                exit(1)
+
+            if not VALID_URL_PATHS.match(app_url):
+                print('Error: %s is not a valid URL path' % app_url)
+                print('must start with / and only regular characters, . and -')
+                exit(1)
+
+        response = api.create_website(args.website_name, args.ip, args.https, \
+            args.subdomains, *site_apps)
+
+        print('Web site has been created:')
+        table = Texttable(max_width=140)
+        table.add_rows([['Param', 'Value']] + [[key, value] for key, value in response.items()])
+        print(table.draw())
+
+def _delete_website(args):
+    api = _login(args)
+    api.delete_website(args.website_name, args.ip, args.https)
+
+def _delete_domain(args):
+    api = _login(args)
+    api.delete_domain(args.domain, ' '.join(args.subdomain))
 
 def _create_db(args):
     if (len(args.name) > 16) and (args.db_type == 'mysql'):
@@ -361,6 +421,30 @@ def main():
     cmd.set_defaults(func=_delete_app)
     cmd.add_argument('name', help='name of the application')
 
+    cmd = subparsers.add_parser('create_domain', help='Create a domain entry')
+    cmd.set_defaults(func=_create_domain)
+    cmd.add_argument('domain', help="a domain name in the form of example.com")
+    cmd.add_argument('subdomain', nargs='*', help="subdomain name of domain")
+
+    cmd = subparsers.add_parser('delete_domain', help='Delete a domain entry')
+    cmd.set_defaults(func=_delete_domain)
+    cmd.add_argument('domain', help="name of the domain to be deleted or the parent domain of the subdomains to be deleted")
+    cmd.add_argument('subdomain', nargs='*', help="subdomains of domain to be deleted (opt)")
+
+    cmd = subparsers.add_parser('create_website', help='Create a new website entry')
+    cmd.set_defaults(func=_create_website)
+    cmd.add_argument('--ip', default='', help="IP address of the server where the entry resides")
+    cmd.add_argument('--subdomains', default='', help="an array of (sub)domains to be associated with the website entry")
+    cmd.add_argument('--https', action="store_true", default=False, help='whether the website entry should use a secure connection')
+    cmd.add_argument('website_name', help="the name of the new website entry")
+    cmd.add_argument('site_apps', nargs='+', help="an array containing a valid application name and a URL path")
+
+    cmd = subparsers.add_parser('delete_website', help='Delete a website entry')
+    cmd.set_defaults(func=_delete_website)
+    cmd.add_argument('--ip', default='', help="IP address of the server where the entry resides")
+    cmd.add_argument('--https', action="store_true", default=False, help='whether the website entry should use a secure connection')
+    cmd.add_argument('website_name', help="the name of the website to be deleted")
+
     cmd = subparsers.add_parser('create_db', help='Create a database')
     cmd.set_defaults(func=_create_db)
     cmd.add_argument('name', help='database name')
@@ -377,7 +461,6 @@ def main():
 
     cmd = subparsers.add_parser('setup_django_project', help='prepare server, create virtualenv, create apps (django itself, static), create db on server, create settings_local for server, setup and prepare gunicorn, setup cronjob')
     cmd.set_defaults(func=_setup_django_project)
-
 
     # Call selected function
     args = parser.parse_args()
