@@ -186,6 +186,27 @@ def _delete_db(args):
     api = _login(args)
     api.delete_db(args.name, args.db_type)
 
+def _create_mailbox(args):
+    api = _login(args)
+
+    if not VALID_SYMBOLS.match(args.mailbox):
+        print('Error: %s is not a valid mailbox name' % args.mailbox)
+        print('use A-Z a-z 0-9 or uderscore symbols only')
+        exit(1)
+
+    response = api.create_mailbox(args.mailbox, args.enable_spam_protection, \
+        args.discard_spam, args.spam_redirect_folder, args.use_manual_procmailrc, \
+        args.manual_procmailrc)
+
+    print('Mailbox has been created:')
+    table = Texttable(max_width=140)
+    table.add_rows([['Param', 'Value']] + [[key, value] for key, value in response.items()])
+    print(table.draw())
+
+def _delete_mailbox(args):
+    api = _login(args)
+    api.delete_mailbox(args.mailbox)
+
 def _state(args):
     """
     Verbose, since some operations a very slow
@@ -455,6 +476,19 @@ def main():
     cmd.set_defaults(func=_delete_db)
     cmd.add_argument('name', help='database name')
     cmd.add_argument('db_type', help="database type ('mysql' or 'postgresql')")
+
+    cmd = subparsers.add_parser('create_mailbox', help='Create a mailbox')
+    cmd.set_defaults(func=_create_mailbox)
+    cmd.add_argument('--enable-spam-protection', action="store_true", default=True, help="whether spam protection is enabled for the mailbox")
+    cmd.add_argument('--discard-spam', action="store_true", default=False, help="whether spam messages received by the new mailbox are discarded (false positives may be lost)")
+    cmd.add_argument('--spam-redirect-folder', default='/Spam', help='name of the IMAP folder where messages identified as spam are stored')
+    cmd.add_argument('--use-manual-procmailrc', action="store_true", default=False, help='name of the IMAP folder where messages identified as spam are stored')
+    cmd.add_argument('--manual-procmailrc', default='', help='the procmailrc rules for the mailbox')
+    cmd.add_argument('mailbox', help="mailbox name")
+
+    cmd = subparsers.add_parser('delete_mailbox', help='Delete a mailbox')
+    cmd.set_defaults(func=_delete_mailbox)
+    cmd.add_argument('mailbox', help='mailbox name')
 
     cmd = subparsers.add_parser('state', help='Short state of your machines (apps count, current ram usage)')
     cmd.set_defaults(func=_state)
