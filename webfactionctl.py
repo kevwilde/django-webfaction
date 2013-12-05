@@ -476,7 +476,7 @@ def main():
     cmd = subparsers.add_parser('create_website', help='Create a new website entry')
     cmd.set_defaults(func=_create_website)
     cmd.add_argument('--ip', default='', help="IP address of the server where the entry resides")
-    cmd.add_argument('--subdomains', default='', help="an array of (sub)domains to be associated with the website entry")
+    cmd.add_argument('--subdomains', nargs='*', default='', help="an array of (sub)domains to be associated with the website entry")
     cmd.add_argument('--https', action="store_true", default=False, help='whether the website entry should use a secure connection')
     cmd.add_argument('website_name', help="the name of the new website entry")
     cmd.add_argument('site_apps', nargs='+', help="an array containing a valid application name and a URL path")
